@@ -1,4 +1,4 @@
-import { Dispatch, SetStateAction, useEffect, useMemo, useState } from "react";
+import { Dispatch, SetStateAction, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Indicator,
@@ -26,6 +26,8 @@ export default function MatchPage() {
   const [search, setSearch] = useState("");
   const [guess, setGuess] = useState("");
   const [phInput, setPhInput] = useState("");
+  const [p1Touched, setP1Touched] = useState(false);
+  const [p2Touched, setP2Touched] = useState(false);
   const [graceSeconds, setGraceSeconds] = useState<number | null>(null);
   const [searching, setSearching] = useState(false);
   const [matchFoundAt, setMatchFoundAt] = useState<number | null>(null);
@@ -37,6 +39,8 @@ export default function MatchPage() {
   const [toasts, setToasts] = useState<
     { id: string; message: string; level: "info" | "warn" | "error" }[]
   >([]);
+  const [scorePulse, setScorePulse] = useState({ you: false, opponent: false });
+  const prevScores = useRef({ you: 0, opponent: 0 });
   const [debugEvents, setDebugEvents] = useState<string[]>([]);
   const debugEnabled = import.meta.env.VITE_DEBUG === "true";
 
@@ -181,12 +185,12 @@ export default function MatchPage() {
   };
 
   const handleSetPh = () => {
-    const value = Number(phInput);
-    if (!Number.isInteger(value)) {
-      pushToast("Inserisci un numero intero", "warn");
+    const validation = getPhValidation(phInput, true);
+    if (!validation.isValid) {
+      setP1Touched(true);
       return;
     }
-    getSocket().emit("match:p1_set_ph", { ph: value });
+    getSocket().emit("match:p1_set_ph", { ph: Number(phInput) });
   };
 
   const handleAskIndicator = (indicator: Indicator) => {
@@ -198,12 +202,12 @@ export default function MatchPage() {
   };
 
   const handleGuess = () => {
-    const value = Number(guess);
-    if (!Number.isInteger(value)) {
-      pushToast("Inserisci un numero intero", "warn");
+    const validation = getPhValidation(guess, true);
+    if (!validation.isValid) {
+      setP2Touched(true);
       return;
     }
-    getSocket().emit("match:p2_guess_ph", { ph: value });
+    getSocket().emit("match:p2_guess_ph", { ph: Number(guess) });
   };
 
   const handleGiveUp = () => {
@@ -231,26 +235,75 @@ export default function MatchPage() {
     return () => window.clearTimeout(timeout);
   }, [matchFoundAt]);
 
+  useEffect(() => {
+    if (!matchState) {
+      return;
+    }
+    setPhInput("");
+    setGuess("");
+    setP1Touched(false);
+    setP2Touched(false);
+    prevScores.current = {
+      you: matchState.role === "p1" ? matchState.p1Score : matchState.p2Score,
+      opponent: matchState.role === "p1" ? matchState.p2Score : matchState.p1Score,
+    };
+  }, [matchState?.matchId]);
+
   const isP1 = matchState?.role === "p1";
   const yourScore = matchState ? (isP1 ? matchState.p1Score : matchState.p2Score) : 0;
   const opponentScore = matchState ? (isP1 ? matchState.p2Score : matchState.p1Score) : 0;
+  const p1Validation = getPhValidation(phInput, p1Touched);
+  const p2Validation = getPhValidation(guess, p2Touched);
+  const p1CanAct = Boolean(
+    isP1 && (matchState?.p1Ph === null || Boolean(matchState?.pendingQuestion))
+  );
+  const p2CanAct = Boolean(
+    !isP1 && matchState?.status === "in_progress" && !matchState?.pendingQuestion
+  );
+  const canAct = isP1 ? p1CanAct : p2CanAct;
+
+  useEffect(() => {
+    if (!matchState) {
+      return;
+    }
+    const previous = prevScores.current;
+    if (previous.you !== yourScore) {
+      setScorePulse((prev) => ({ ...prev, you: true }));
+      window.setTimeout(() => {
+        setScorePulse((prev) => ({ ...prev, you: false }));
+      }, 320);
+    }
+    if (previous.opponent !== opponentScore) {
+      setScorePulse((prev) => ({ ...prev, opponent: true }));
+      window.setTimeout(() => {
+        setScorePulse((prev) => ({ ...prev, opponent: false }));
+      }, 320);
+    }
+    prevScores.current = { you: yourScore, opponent: opponentScore };
+  }, [yourScore, opponentScore, matchState?.matchId]);
+
   const canGiveUp = matchState ? yourScore === 0 && matchState.status !== "ended" : false;
 
-  const overlay = deriveOverlay({
+  const overlay = getActiveOverlay({
     matchState,
     ended,
     isP1,
+    canAct,
     searching,
     matchFoundAt,
     retryOverlay,
     graceSeconds,
   });
   const isPaused = Boolean(overlay);
+  const showTurnOverlay = Boolean(
+    !overlay && matchState?.status === "in_progress" && !canAct
+  );
 
   if (ended && matchState) {
     return (
       <section className="page game-shell">
         <ToastStack toasts={toasts} />
+        {debugEnabled && <DebugPanel events={debugEvents} />}
         <EndScreen
           ended={ended}
           isWinner={ended.winnerPlayerId === matchState.you.playerId}
@@ -269,6 +322,7 @@ export default function MatchPage() {
     return (
       <section className="page game-shell">
         <ToastStack toasts={toasts} />
+        {debugEnabled && <DebugPanel events={debugEvents} />}
         <div className="game-stage">
           {overlay && <StateOverlay overlay={overlay} onDismiss={() => setRetryOverlay(null)} />}
           <div className={`game-content ${isPaused ? "is-paused" : ""}`}>
@@ -288,44 +342,66 @@ export default function MatchPage() {
   return (
     <section className="page game-shell">
       <ToastStack toasts={toasts} />
+      {debugEnabled && <DebugPanel events={debugEvents} />}
+      <GameHud
+        role={isP1 ? "P1" : "P2"}
+        nickname={matchState.you.nickname}
+        opponentNickname={matchState.opponent.nickname}
+        yourScore={yourScore}
+        opponentScore={opponentScore}
+        questionsCount={matchState.questionsCount}
+        opponentConnected={matchState.opponent.connected}
+        graceSeconds={graceSeconds}
+        scorePulse={scorePulse}
+      />
       <div className="game-stage">
         {overlay && <StateOverlay overlay={overlay} onDismiss={() => setRetryOverlay(null)} />}
         <div className={`game-content ${isPaused ? "is-paused" : ""}`}>
-          <div className="scoreboard">
-            <div className="score-card">
-              <div className="score-label">Il tuo punteggio</div>
-              <div className="score">{yourScore}</div>
-            </div>
-            <div className="score-card">
-              <div className="score-label">Punteggio avversario</div>
-              <div className="score">{opponentScore}</div>
-            </div>
-          </div>
-
           <div className="match-grid">
-            <div className="card game-panel">
+            <div
+              className={`card game-panel ${
+                (isP1 ? !p1CanAct : !p2CanAct) ? "panel-disabled" : ""
+              }`}
+            >
               <div className="panel-header">
                 <h2>Ruolo: {isP1 ? "P1" : "P2"}</h2>
                 <span className="pill">{matchState.status === "in_progress" ? "In partita" : "Preparazione"}</span>
               </div>
+              {showTurnOverlay && (
+                <div className="turn-overlay">E' il turno dell'altro giocatore</div>
+              )}
               {isP1 ? (
                 <>
                   <div className="section">
                     <h3>Il tuo pH segreto</h3>
                     {matchState.p1Ph === null ? (
-                      <div className="inline-form">
-                        <input
-                          type="number"
-                          min={0}
-                          max={14}
-                          value={phInput}
-                          onChange={(event) => setPhInput(event.target.value)}
-                          placeholder="0 - 14"
-                        />
-                        <button onClick={handleSetPh} className="primary">
-                          Conferma pH
-                        </button>
-                      </div>
+                      <>
+                        <div className="inline-form">
+                          <input
+                            type="number"
+                            min={0}
+                            max={14}
+                            value={phInput}
+                            onChange={(event) => {
+                              setPhInput(event.target.value);
+                              setP1Touched(true);
+                            }}
+                            onBlur={() => setP1Touched(true)}
+                            className={p1Validation.showError ? "input-error" : ""}
+                            placeholder="0 - 14"
+                          />
+                          <button
+                            onClick={handleSetPh}
+                            className="primary"
+                            disabled={!p1Validation.isValid}
+                          >
+                            Conferma pH
+                          </button>
+                        </div>
+                        {p1Validation.showError && (
+                          <div className="helper-error">{p1Validation.message}</div>
+                        )}
+                      </>
                     ) : (
                       <div className="pill highlight">pH scelto: {matchState.p1Ph}</div>
                     )}
@@ -334,7 +410,7 @@ export default function MatchPage() {
                     <h3>Domanda attiva</h3>
                     {matchState.pendingQuestion ? (
                       <>
-                        <IndicatorCard indicator={matchState.pendingQuestion} />
+                        <IndicatorCard indicator={matchState.pendingQuestion} variant="question" />
                         <div className="button-row large">
                           <button className="secondary" onClick={() => handleAnswer("ACIDO")}>ACIDO</button>
                           <button className="secondary" onClick={() => handleAnswer("INTERMEDIO")}>INTERMEDIO</button>
@@ -358,7 +434,7 @@ export default function MatchPage() {
                     <div className="indicator-list">
                       {filteredIndicators.map((indicator) => (
                         <div key={indicator.id} className="indicator-item">
-                          <IndicatorCard indicator={indicator} compact />
+                          <IndicatorCard indicator={indicator} compact variant="list" />
                           <button
                             className="primary"
                             onClick={() => handleAskIndicator(indicator)}
@@ -378,17 +454,29 @@ export default function MatchPage() {
                         min={0}
                         max={14}
                         value={guess}
-                        onChange={(event) => setGuess(event.target.value)}
+                        onChange={(event) => {
+                          setGuess(event.target.value);
+                          setP2Touched(true);
+                        }}
+                        onBlur={() => setP2Touched(true)}
+                        className={p2Validation.showError ? "input-error" : ""}
                         placeholder="0 - 14"
                       />
                       <button
                         className="secondary"
                         onClick={handleGuess}
-                        disabled={matchState.status !== "in_progress" || Boolean(matchState.pendingQuestion)}
+                        disabled={
+                          !p2Validation.isValid ||
+                          matchState.status !== "in_progress" ||
+                          Boolean(matchState.pendingQuestion)
+                        }
                       >
                         Indovina
                       </button>
                     </div>
+                    {p2Validation.showError && (
+                      <div className="helper-error">{p2Validation.message}</div>
+                    )}
                   </div>
                 </>
               )}
@@ -404,11 +492,18 @@ export default function MatchPage() {
                 <ul className="history">
                   {matchState.history.map((item, index) => (
                     <li key={`${item.indicatorId}-${index}`}>
-                      <div className="history-title">{item.indicatorName}</div>
-                      <div className={`tag ${item.outcome.toLowerCase()}`}>{item.outcome}</div>
-                      <div className="history-meta">
-                        acido: {item.acidColor} | basico: {item.baseColor} | {item.low} - {item.high}
-                      </div>
+                      <IndicatorCard
+                        indicator={{
+                          id: item.indicatorId,
+                          name: item.indicatorName,
+                          acidColor: item.acidColor,
+                          baseColor: item.baseColor,
+                          low: item.low,
+                          high: item.high,
+                        }}
+                        outcome={item.outcome}
+                        variant="history"
+                      />
                     </li>
                   ))}
                 </ul>
@@ -427,15 +522,37 @@ export default function MatchPage() {
   );
 }
 
-function IndicatorCard({ indicator, compact }: { indicator: Indicator; compact?: boolean }) {
+function IndicatorCard({
+  indicator,
+  compact,
+  outcome,
+  variant,
+}: {
+  indicator: Indicator;
+  compact?: boolean;
+  outcome?: string;
+  variant?: "history" | "question" | "list";
+}) {
   const acidColor = colorForName(indicator.acidColor);
   const baseColor = colorForName(indicator.baseColor);
   const acidIsClear = indicator.acidColor.toLowerCase() === "incolore";
   const baseIsClear = indicator.baseColor.toLowerCase() === "incolore";
+  const classes = [
+    "indicator-card",
+    compact ? "compact" : "",
+    variant ? `variant-${variant}` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
-    <div className={compact ? "indicator-card compact" : "indicator-card"}>
-      <div className="indicator-name">{indicator.name}</div>
+    <div className={classes}>
+      <div className="indicator-top">
+        <div className="indicator-name">{indicator.name}</div>
+        {outcome && (
+          <span className={`outcome-badge ${outcome.toLowerCase()}`}>{outcome}</span>
+        )}
+      </div>
       <div className="indicator-swatches">
         <div className="swatch">
           <span
@@ -452,7 +569,9 @@ function IndicatorCard({ indicator, compact }: { indicator: Indicator; compact?:
           <span>Basica: {indicator.baseColor}</span>
         </div>
       </div>
-      <div className="indicator-meta">Intervallo di viraggio: {indicator.low} - {indicator.high}</div>
+      <div className="indicator-footer">
+        <span className="range-pill">Viraggio: {indicator.low} - {indicator.high}</span>
+      </div>
     </div>
   );
 }
@@ -472,10 +591,11 @@ function colorForName(name: string) {
   return palette[key] || "#c9c9c9";
 }
 
-function deriveOverlay(params: {
+function getActiveOverlay(params: {
   matchState: MatchState | null;
   ended: MatchEndedPayload | null;
   isP1: boolean | null;
+  canAct: boolean;
   searching: boolean;
   matchFoundAt: number | null;
   retryOverlay: { title: string; subtitle: string; role: "p1" | "p2" } | null;
@@ -485,6 +605,7 @@ function deriveOverlay(params: {
     matchState,
     ended,
     isP1,
+    canAct,
     searching,
     matchFoundAt,
     retryOverlay,
@@ -501,6 +622,18 @@ function deriveOverlay(params: {
       title: retryOverlay.title,
       subtitle: retryOverlay.subtitle,
       actionLabel: "Riprova",
+      tone: "alert",
+      showSpinner: false,
+    } as const;
+  }
+
+  if (matchState?.opponent.graceEndsAt && !matchState.opponent.connected) {
+    return {
+      kind: "opponent_disconnect",
+      title: "Avversario disconnesso",
+      subtitle: `Rientro entro ${graceSeconds ?? 0}s`,
+      tone: "warning",
+      showSpinner: true,
     } as const;
   }
 
@@ -509,6 +642,8 @@ function deriveOverlay(params: {
       kind: "found",
       title: "Match trovato!",
       subtitle: "Preparati, la partita sta iniziando.",
+      tone: "success",
+      showSpinner: false,
     } as const;
   }
 
@@ -518,41 +653,43 @@ function deriveOverlay(params: {
         kind: "searching",
         title: "Cerco un avversario",
         subtitle: "Restate connessi, stiamo abbinando la partita.",
+        tone: "waiting",
+        showSpinner: true,
       } as const;
     }
     return null;
   }
 
-  if (matchState.opponent.graceEndsAt && !matchState.opponent.connected) {
-    return {
-      kind: "opponent_disconnect",
-      title: "Avversario disconnesso",
-      subtitle: `Rientro entro ${graceSeconds ?? 0}s`,
-    } as const;
-  }
+  if (!canAct) {
+    if (matchState.status === "waiting_p1_ph" && !isP1) {
+      return {
+        kind: "waiting_p1_ph",
+        title: "Attendi P1",
+        subtitle: "E' il turno dell'altro giocatore.",
+        tone: "waiting",
+        showSpinner: true,
+      } as const;
+    }
 
-  if (matchState.status === "waiting_p1_ph" && !isP1) {
-    return {
-      kind: "waiting_p1_ph",
-      title: "Attendi P1",
-      subtitle: "P1 sta scegliendo il pH segreto.",
-    } as const;
-  }
+    if (matchState.status === "in_progress" && isP1 && !matchState.pendingQuestion) {
+      return {
+        kind: "waiting_p2_question",
+        title: "Attendi la domanda",
+        subtitle: "E' il turno dell'altro giocatore.",
+        tone: "waiting",
+        showSpinner: true,
+      } as const;
+    }
 
-  if (matchState.status === "in_progress" && isP1 && !matchState.pendingQuestion) {
-    return {
-      kind: "waiting_p2_question",
-      title: "Attendi la domanda",
-      subtitle: "P2 sta scegliendo l indicatore.",
-    } as const;
-  }
-
-  if (matchState.status === "in_progress" && !isP1 && matchState.pendingQuestion) {
-    return {
-      kind: "waiting_p1_answer",
-      title: "P1 sta rispondendo",
-      subtitle: "Risposta in arrivo.",
-    } as const;
+    if (matchState.status === "in_progress" && !isP1 && matchState.pendingQuestion) {
+      return {
+        kind: "waiting_p1_answer",
+        title: "P1 sta rispondendo",
+        subtitle: "E' il turno dell'altro giocatore.",
+        tone: "waiting",
+        showSpinner: true,
+      } as const;
+    }
   }
 
   return null;
@@ -575,13 +712,15 @@ function StateOverlay({
     title: string;
     subtitle: string;
     actionLabel?: string;
+    tone: "alert" | "warning" | "waiting" | "success";
+    showSpinner: boolean;
   };
   onDismiss: () => void;
 }) {
   return (
     <div className="game-overlay">
-      <div className="overlay-card">
-        <div className="spinner" />
+      <div className={`overlay-card tone-${overlay.tone}`}>
+        {overlay.showSpinner ? <div className="spinner" /> : <div className="overlay-icon" />}
         <h3>{overlay.title}</h3>
         <p>{overlay.subtitle}</p>
         {overlay.actionLabel && (
@@ -589,6 +728,57 @@ function StateOverlay({
             {overlay.actionLabel}
           </button>
         )}
+      </div>
+    </div>
+  );
+}
+
+function GameHud({
+  role,
+  nickname,
+  opponentNickname,
+  yourScore,
+  opponentScore,
+  questionsCount,
+  opponentConnected,
+  graceSeconds,
+  scorePulse,
+}: {
+  role: "P1" | "P2";
+  nickname: string;
+  opponentNickname: string;
+  yourScore: number;
+  opponentScore: number;
+  questionsCount: number;
+  opponentConnected: boolean;
+  graceSeconds: number | null;
+  scorePulse: { you: boolean; opponent: boolean };
+}) {
+  return (
+    <div className="game-hud">
+      <div className="hud-role">
+        <span className="role-badge">{role}</span>
+        <div className="hud-name">{nickname}</div>
+        <div className="hud-sub">vs {opponentNickname}</div>
+      </div>
+      <div className="hud-scores">
+        <div className={`hud-score ${scorePulse.you ? "pop" : ""}`}>
+          <div className="hud-score-label">TU</div>
+          <div className="hud-score-value">{yourScore}</div>
+        </div>
+        <div className={`hud-score ${scorePulse.opponent ? "pop" : ""}`}>
+          <div className="hud-score-label">AVV</div>
+          <div className="hud-score-value">{opponentScore}</div>
+        </div>
+      </div>
+      <div className="hud-meta">
+        <div className="hud-questions">Domande (a): {questionsCount}</div>
+        <div className={`hud-connection ${opponentConnected ? "ok" : "down"}`}>
+          <span className="status-dot" />
+          {opponentConnected
+            ? "Avversario connesso"
+            : `Disconnesso ${graceSeconds ?? 0}s`}
+        </div>
       </div>
     </div>
   );
@@ -652,12 +842,25 @@ function formatEndReason(reason: string) {
     case "p2_guess_correct":
       return "Indovinato il pH";
     case "give_up":
-      return "Arrendersi";
+      return "Resa";
     case "disconnect_forfeit":
       return "Disconnessione";
     default:
       return "Partita terminata";
   }
+}
+
+function getPhValidation(value: string, touched: boolean) {
+  const trimmed = value.trim();
+  const parsed = Number(trimmed);
+  const isValid =
+    trimmed.length > 0 && Number.isInteger(parsed) && parsed >= 0 && parsed <= 14;
+
+  return {
+    isValid,
+    showError: touched && !isValid,
+    message: "Inserisci un numero intero tra 0 e 14",
+  };
 }
 
 function ToastStack({

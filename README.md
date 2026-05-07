@@ -65,3 +65,15 @@ In Docker:
 - P2 chiede un indicatore e P1 risponde con ACIDO / INTERMEDIO / BASICO
 - Le penalita sono applicate dal server
 - La classifica si aggiorna solo a fine partita
+
+## Note sviluppo UI
+Aggiornamenti recenti:
+- HUD di gioco con punteggi, ruolo, domande e connessione.
+- Overlay con priorita (attesa, disconnessione, retry) e toast non invasivi.
+- Validazione pH inline (bordo rosso + messaggio).
+
+Come testare:
+- Apri due schede e avvia un Quick Match.
+- Verifica: attese, turni, overlay di retry, fine partita.
+- Verifica validazione pH (input e pulsanti disabilitati).
+- Facoltativo: imposta `VITE_DEBUG=true` per il pannello debug in basso a sinistra.

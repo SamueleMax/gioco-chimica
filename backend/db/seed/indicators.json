@@ -1,0 +1,50 @@
+[
+  {
+    "id": 1,
+    "name": "Tornasole",
+    "acidColor": "rosso",
+    "baseColor": "blu",
+    "low": 4.5,
+    "high": 8.3
+  },
+  {
+    "id": 2,
+    "name": "Fenolftaleina",
+    "acidColor": "incolore",
+    "baseColor": "fucsia",
+    "low": 8.2,
+    "high": 10.0
+  },
+  {
+    "id": 3,
+    "name": "Metilarancio",
+    "acidColor": "rosso",
+    "baseColor": "giallo",
+    "low": 3.1,
+    "high": 4.4
+  },
+  {
+    "id": 4,
+    "name": "Blu di bromotimolo",
+    "acidColor": "giallo",
+    "baseColor": "blu",
+    "low": 6.0,
+    "high": 7.6
+  },
+  {
+    "id": 5,
+    "name": "Rosso fenolo",
+    "acidColor": "giallo",
+    "baseColor": "rosso",
+    "low": 6.8,
+    "high": 8.2
+  },
+  {
+    "id": 6,
+    "name": "Verde di bromocresolo",
+    "acidColor": "giallo",
+    "baseColor": "blu",
+    "low": 3.8,
+    "high": 5.4
+  }
+]

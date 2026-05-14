@@ -1,13 +1,37 @@
-import { Dispatch, SetStateAction, useEffect, useMemo, useRef, useState } from "react";
+import {
+  CSSProperties,
+  Dispatch,
+  ReactNode,
+  SetStateAction,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Indicator,
   MatchEndedPayload,
+  MatchNotification,
   MatchState,
+  PresencePayload,
 } from "@shared/types";
 import { authenticateSocket, getSocket } from "../socket";
 
 const QUICK_MATCH_KEY = "quickMatchPending";
+const PH_VALUES = Array.from({ length: 15 }, (_, index) => index);
+
+type Toast = { id: string; message: string; level: "info" | "warn" | "error" };
+type RetryOverlay = { title: string; subtitle: string; role: "p1" | "p2" };
+
+type SceneState =
+  | { id: "idle" }
+  | { id: "matchmaking" }
+  | { id: "match_found" }
+  | { id: "p1_choose_ph" }
+  | { id: "p2_choose_indicator" }
+  | { id: "p1_answer_indicator" }
+  | { id: "waiting"; title: string; subtitle: string };
 
 function ensureAuth() {
   const playerId = localStorage.getItem("playerId");
@@ -24,22 +48,17 @@ export default function MatchPage() {
   const [matchState, setMatchState] = useState<MatchState | null>(null);
   const [ended, setEnded] = useState<MatchEndedPayload | null>(null);
   const [search, setSearch] = useState("");
-  const [guess, setGuess] = useState("");
-  const [phInput, setPhInput] = useState("");
+  const [p1Selection, setP1Selection] = useState<number | null>(null);
+  const [guessSelection, setGuessSelection] = useState<number | null>(null);
   const [p1Touched, setP1Touched] = useState(false);
   const [p2Touched, setP2Touched] = useState(false);
   const [graceSeconds, setGraceSeconds] = useState<number | null>(null);
   const [searching, setSearching] = useState(false);
   const [matchFoundAt, setMatchFoundAt] = useState<number | null>(null);
-  const [retryOverlay, setRetryOverlay] = useState<{
-    title: string;
-    subtitle: string;
-    role: "p1" | "p2";
-  } | null>(null);
-  const [toasts, setToasts] = useState<
-    { id: string; message: string; level: "info" | "warn" | "error" }[]
-  >([]);
+  const [retryOverlay, setRetryOverlay] = useState<RetryOverlay | null>(null);
+  const [toasts, setToasts] = useState<Toast[]>([]);
   const [scorePulse, setScorePulse] = useState({ you: false, opponent: false });
+  const [guessOpen, setGuessOpen] = useState(false);
   const prevScores = useRef({ you: 0, opponent: 0 });
   const [debugEvents, setDebugEvents] = useState<string[]>([]);
   const debugEnabled = import.meta.env.VITE_DEBUG === "true";
@@ -54,7 +73,10 @@ export default function MatchPage() {
     if (!debugEnabled) {
       return;
     }
-    setDebugEvents((prev) => [...prev.slice(-8), `${new Date().toLocaleTimeString()} ${message}`]);
+    setDebugEvents((prev) => [
+      ...prev.slice(-8),
+      `${new Date().toLocaleTimeString()} ${message}`,
+    ]);
   };
 
   const clearQuickMatchRequest = () => {
@@ -65,7 +87,7 @@ export default function MatchPage() {
     const auth = ensureAuth();
     const socket = getSocket();
 
-    socket.on("match:state", (state) => {
+    socket.on("match:state", (state: MatchState) => {
       setMatchState(state);
       setEnded(null);
       setSearching(false);
@@ -73,7 +95,7 @@ export default function MatchPage() {
       logDebug("match:state ricevuto");
     });
 
-    socket.on("auth:ok", (payload) => {
+    socket.on("auth:ok", (payload: { playerId: string; nickname: string }) => {
       localStorage.setItem("playerId", payload.playerId);
       localStorage.setItem("nickname", payload.nickname);
       logDebug("auth:ok ricevuto");
@@ -93,17 +115,17 @@ export default function MatchPage() {
       logDebug("match:found ricevuto");
     });
 
-    socket.on("match:notification", (payload) => {
+    socket.on("match:notification", (payload: MatchNotification) => {
       handleNotification(payload.message, payload.level);
       logDebug(`match:notification ${payload.message}`);
     });
 
-    socket.on("match:ended", (payload) => {
+    socket.on("match:ended", (payload: MatchEndedPayload) => {
       setEnded(payload);
       logDebug("match:ended ricevuto");
     });
 
-    socket.on("presence:opponent", (payload) => {
+    socket.on("presence:opponent", (payload: PresencePayload) => {
       setMatchState((prev) =>
         prev
           ? {
@@ -161,15 +183,49 @@ export default function MatchPage() {
     return () => window.clearInterval(interval);
   }, [matchState?.opponent.graceEndsAt]);
 
+  useEffect(() => {
+    if (!matchFoundAt) {
+      return;
+    }
+    const timeout = window.setTimeout(() => setMatchFoundAt(null), 1400);
+    return () => window.clearTimeout(timeout);
+  }, [matchFoundAt]);
+
+  useEffect(() => {
+    if (!matchState) {
+      return;
+    }
+    setP1Selection(null);
+    setGuessSelection(null);
+    setP1Touched(false);
+    setP2Touched(false);
+    setGuessOpen(false);
+    setRetryOverlay(null);
+    prevScores.current = {
+      you: matchState.role === "p1" ? matchState.p1Score : matchState.p2Score,
+      opponent: matchState.role === "p1" ? matchState.p2Score : matchState.p1Score,
+    };
+  }, [matchState?.matchId]);
+
+  useEffect(() => {
+    if (retryOverlay) {
+      setGuessOpen(false);
+    }
+  }, [retryOverlay]);
+
+  useEffect(() => {
+    if (matchState?.opponent.graceEndsAt && !matchState.opponent.connected) {
+      setGuessOpen(false);
+    }
+  }, [matchState?.opponent.graceEndsAt, matchState?.opponent.connected]);
+
   const indicators = matchState?.indicators || [];
   const filteredIndicators = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) {
       return indicators;
     }
-    return indicators.filter((indicator) =>
-      indicator.name.toLowerCase().includes(query)
-    );
+    return indicators.filter((indicator) => indicator.name.toLowerCase().includes(query));
   }, [indicators, search]);
 
   const handleQuickMatch = () => {
@@ -185,12 +241,11 @@ export default function MatchPage() {
   };
 
   const handleSetPh = () => {
-    const validation = getPhValidation(phInput, true);
-    if (!validation.isValid) {
+    if (p1Selection === null) {
       setP1Touched(true);
       return;
     }
-    getSocket().emit("match:p1_set_ph", { ph: Number(phInput) });
+    getSocket().emit("match:p1_set_ph", { ph: p1Selection });
   };
 
   const handleAskIndicator = (indicator: Indicator) => {
@@ -202,12 +257,14 @@ export default function MatchPage() {
   };
 
   const handleGuess = () => {
-    const validation = getPhValidation(guess, true);
-    if (!validation.isValid) {
+    if (guessSelection === null) {
       setP2Touched(true);
       return;
     }
-    getSocket().emit("match:p2_guess_ph", { ph: Number(guess) });
+    getSocket().emit("match:p2_guess_ph", { ph: guessSelection });
+    setGuessOpen(false);
+    setGuessSelection(null);
+    setP2Touched(false);
   };
 
   const handleGiveUp = () => {
@@ -217,50 +274,14 @@ export default function MatchPage() {
     getSocket().emit("match:give_up");
   };
 
-  useEffect(() => {
-    if (!retryOverlay) {
-      return;
-    }
-    const timeout = window.setTimeout(() => {
-      setRetryOverlay(null);
-    }, 2200);
-    return () => window.clearTimeout(timeout);
-  }, [retryOverlay]);
-
-  useEffect(() => {
-    if (!matchFoundAt) {
-      return;
-    }
-    const timeout = window.setTimeout(() => setMatchFoundAt(null), 1800);
-    return () => window.clearTimeout(timeout);
-  }, [matchFoundAt]);
-
-  useEffect(() => {
-    if (!matchState) {
-      return;
-    }
-    setPhInput("");
-    setGuess("");
-    setP1Touched(false);
-    setP2Touched(false);
-    prevScores.current = {
-      you: matchState.role === "p1" ? matchState.p1Score : matchState.p2Score,
-      opponent: matchState.role === "p1" ? matchState.p2Score : matchState.p1Score,
-    };
-  }, [matchState?.matchId]);
-
   const isP1 = matchState?.role === "p1";
   const yourScore = matchState ? (isP1 ? matchState.p1Score : matchState.p2Score) : 0;
   const opponentScore = matchState ? (isP1 ? matchState.p2Score : matchState.p1Score) : 0;
-  const p1Validation = getPhValidation(phInput, p1Touched);
-  const p2Validation = getPhValidation(guess, p2Touched);
-  const p1CanAct = Boolean(
-    isP1 && (matchState?.p1Ph === null || Boolean(matchState?.pendingQuestion))
+  const yourPenalty = matchState ? (isP1 ? matchState.p1Penalty : matchState.p2Penalty) : 0;
+  const canGiveUp = matchState ? yourScore === 0 && matchState.status !== "ended" : false;
+  const isDisconnected = Boolean(
+    matchState?.opponent.graceEndsAt && !matchState.opponent.connected
   );
-  const p2CanAct = Boolean(
-    !isP1 && matchState?.status === "in_progress" && !matchState?.pendingQuestion
-  );
-  const canAct = isP1 ? p1CanAct : p2CanAct;
 
   useEffect(() => {
     if (!matchState) {
@@ -282,26 +303,9 @@ export default function MatchPage() {
     prevScores.current = { you: yourScore, opponent: opponentScore };
   }, [yourScore, opponentScore, matchState?.matchId]);
 
-  const canGiveUp = matchState ? yourScore === 0 && matchState.status !== "ended" : false;
-
-  const overlay = getActiveOverlay({
-    matchState,
-    ended,
-    isP1,
-    canAct,
-    searching,
-    matchFoundAt,
-    retryOverlay,
-    graceSeconds,
-  });
-  const isPaused = Boolean(overlay);
-  const showTurnOverlay = Boolean(
-    !overlay && matchState?.status === "in_progress" && !canAct
-  );
-
   if (ended && matchState) {
     return (
-      <section className="page game-shell">
+      <section className="page page-game">
         <ToastStack toasts={toasts} />
         {debugEnabled && <DebugPanel events={debugEvents} />}
         <EndScreen
@@ -318,220 +322,343 @@ export default function MatchPage() {
     );
   }
 
-  if (!matchState) {
-    return (
-      <section className="page game-shell">
-        <ToastStack toasts={toasts} />
-        {debugEnabled && <DebugPanel events={debugEvents} />}
-        <div className="game-stage">
-          {overlay && <StateOverlay overlay={overlay} onDismiss={() => setRetryOverlay(null)} />}
-          <div className={`game-content ${isPaused ? "is-paused" : ""}`}>
-            <div className="card empty-card">
-              <h2>Nessuna partita attiva</h2>
-              <p>Premi per cercare un avversario e iniziare subito.</p>
-              <button className="primary" onClick={handleQuickMatch}>
-                Cerca partita
-              </button>
-              <button className="ghost" onClick={() => navigate("/")}>Torna alla home</button>
-            </div>
-          </div>
-        </div>
-      </section>
-    );
-  }
+  const scene = resolveScene({ matchState, searching, matchFoundAt, isP1: isP1 ?? null });
+  const sceneKey = `${scene.id}-${matchState?.matchId ?? "idle"}-${matchFoundAt ?? 0}`;
+
   return (
-    <section className="page game-shell">
+    <section className="page page-game">
       <ToastStack toasts={toasts} />
       {debugEnabled && <DebugPanel events={debugEvents} />}
-      <GameHud
-        role={isP1 ? "P1" : "P2"}
-        nickname={matchState.you.nickname}
-        opponentNickname={matchState.opponent.nickname}
-        yourScore={yourScore}
-        opponentScore={opponentScore}
-        questionsCount={matchState.questionsCount}
-        opponentConnected={matchState.opponent.connected}
-        graceSeconds={graceSeconds}
-        scorePulse={scorePulse}
-      />
-      <div className="game-stage">
-        {overlay && <StateOverlay overlay={overlay} onDismiss={() => setRetryOverlay(null)} />}
-        <div className={`game-content ${isPaused ? "is-paused" : ""}`}>
-          <div className="match-grid">
-            <div
-              className={`card game-panel ${
-                (isP1 ? !p1CanAct : !p2CanAct) ? "panel-disabled" : ""
-              }`}
-            >
-              <div className="panel-header">
-                <h2>Ruolo: {isP1 ? "P1" : "P2"}</h2>
-                <span className="pill">{matchState.status === "in_progress" ? "In partita" : "Preparazione"}</span>
-              </div>
-              {showTurnOverlay && (
-                <div className="turn-overlay">E' il turno dell'altro giocatore</div>
-              )}
-              {isP1 ? (
-                <>
-                  <div className="section">
-                    <h3>Il tuo pH segreto</h3>
-                    {matchState.p1Ph === null ? (
-                      <>
-                        <div className="inline-form">
-                          <input
-                            type="number"
-                            min={0}
-                            max={14}
-                            value={phInput}
-                            onChange={(event) => {
-                              setPhInput(event.target.value);
-                              setP1Touched(true);
-                            }}
-                            onBlur={() => setP1Touched(true)}
-                            className={p1Validation.showError ? "input-error" : ""}
-                            placeholder="0 - 14"
-                          />
-                          <button
-                            onClick={handleSetPh}
-                            className="primary"
-                            disabled={!p1Validation.isValid}
-                          >
-                            Conferma pH
-                          </button>
-                        </div>
-                        {p1Validation.showError && (
-                          <div className="helper-error">{p1Validation.message}</div>
-                        )}
-                      </>
-                    ) : (
-                      <div className="pill highlight">pH scelto: {matchState.p1Ph}</div>
-                    )}
-                  </div>
-                  <div className="section">
-                    <h3>Domanda attiva</h3>
-                    {matchState.pendingQuestion ? (
-                      <>
-                        <IndicatorCard indicator={matchState.pendingQuestion} variant="question" />
-                        <div className="button-row large">
-                          <button className="secondary" onClick={() => handleAnswer("ACIDO")}>ACIDO</button>
-                          <button className="secondary" onClick={() => handleAnswer("INTERMEDIO")}>INTERMEDIO</button>
-                          <button className="secondary" onClick={() => handleAnswer("BASICO")}>BASICO</button>
-                        </div>
-                      </>
-                    ) : (
-                      <p>In attesa della prossima domanda.</p>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="section">
-                    <h3>Elenco indicatori</h3>
-                    <input
-                      value={search}
-                      onChange={(event) => setSearch(event.target.value)}
-                      placeholder="Cerca indicatore"
-                    />
-                    <div className="indicator-list">
-                      {filteredIndicators.map((indicator) => (
-                        <div key={indicator.id} className="indicator-item">
-                          <IndicatorCard indicator={indicator} compact variant="list" />
-                          <button
-                            className="primary"
-                            onClick={() => handleAskIndicator(indicator)}
-                            disabled={Boolean(matchState.pendingQuestion) || matchState.status !== "in_progress"}
-                          >
-                            Chiedi
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="section">
-                    <h3>Indovina il pH</h3>
-                    <div className="inline-form">
-                      <input
-                        type="number"
-                        min={0}
-                        max={14}
-                        value={guess}
-                        onChange={(event) => {
-                          setGuess(event.target.value);
-                          setP2Touched(true);
-                        }}
-                        onBlur={() => setP2Touched(true)}
-                        className={p2Validation.showError ? "input-error" : ""}
-                        placeholder="0 - 14"
-                      />
-                      <button
-                        className="secondary"
-                        onClick={handleGuess}
-                        disabled={
-                          !p2Validation.isValid ||
-                          matchState.status !== "in_progress" ||
-                          Boolean(matchState.pendingQuestion)
-                        }
-                      >
-                        Indovina
-                      </button>
-                    </div>
-                    {p2Validation.showError && (
-                      <div className="helper-error">{p2Validation.message}</div>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
 
-            <div className="card game-panel">
-              <div className="panel-header">
-                <h2>Storico risposte validate</h2>
-              </div>
-              {matchState.history.length === 0 ? (
-                <p>Nessuna risposta valida ancora.</p>
-              ) : (
-                <ul className="history">
-                  {matchState.history.map((item, index) => (
-                    <li key={`${item.indicatorId}-${index}`}>
-                      <IndicatorCard
-                        indicator={{
-                          id: item.indicatorId,
-                          name: item.indicatorName,
-                          acidColor: item.acidColor,
-                          baseColor: item.baseColor,
-                          low: item.low,
-                          high: item.high,
-                        }}
-                        outcome={item.outcome}
-                        variant="history"
-                      />
-                    </li>
-                  ))}
-                </ul>
-              )}
+      {matchState && (
+        <MatchHud
+          role={isP1 ? "P1" : "P2"}
+          nickname={matchState.you.nickname}
+          opponentNickname={matchState.opponent.nickname}
+          yourScore={yourScore}
+          opponentScore={opponentScore}
+          questionsCount={matchState.questionsCount}
+          opponentConnected={matchState.opponent.connected}
+          graceSeconds={graceSeconds}
+          scorePulse={scorePulse}
+          yourPenalty={yourPenalty}
+          canGiveUp={canGiveUp}
+          onGiveUp={handleGiveUp}
+        />
+      )}
 
-              {canGiveUp && (
-                <button className="danger" onClick={handleGiveUp}>
-                  Arrenditi
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
+      <div className="scene-layer">
+        <SceneFrame id={scene.id} key={sceneKey}>
+          {scene.id === "idle" && (
+            <IdleScene onQuickMatch={handleQuickMatch} onHome={() => navigate("/")} />
+          )}
+          {scene.id === "matchmaking" && (
+            <MatchmakingScene onCancel={() => navigate("/")} />
+          )}
+          {scene.id === "match_found" && <MatchFoundScene />}
+          {scene.id === "p1_choose_ph" && (
+            <P1ChoosePhScene
+              selection={p1Selection}
+              onSelect={setP1Selection}
+              onConfirm={handleSetPh}
+              showError={p1Touched && p1Selection === null}
+              onTouched={() => setP1Touched(true)}
+            />
+          )}
+          {scene.id === "p1_answer_indicator" && matchState?.pendingQuestion && (
+            <P1AnswerScene
+              indicator={matchState.pendingQuestion}
+              onAnswer={handleAnswer}
+              history={matchState.history}
+            />
+          )}
+          {scene.id === "p2_choose_indicator" && matchState && (
+            <P2IndicatorScene
+              search={search}
+              onSearch={setSearch}
+              indicators={filteredIndicators}
+              onAsk={handleAskIndicator}
+              onGuess={() => setGuessOpen(true)}
+              history={matchState.history}
+            />
+          )}
+          {scene.id === "waiting" && (
+            <WaitingScene title={scene.title} subtitle={scene.subtitle} />
+          )}
+        </SceneFrame>
       </div>
+
+      {isDisconnected && (
+        <OverlayNotice
+          tone="warning"
+          title="Avversario disconnesso"
+          subtitle={`Rientro entro ${graceSeconds ?? 0}s`}
+          showSpinner
+        />
+      )}
+
+      {!isDisconnected && retryOverlay && (
+        <OverlayNotice
+          tone="alert"
+          title={retryOverlay.title}
+          subtitle={retryOverlay.subtitle}
+          actionLabel="Riprova"
+          onAction={() => setRetryOverlay(null)}
+        />
+      )}
+
+      {!isDisconnected && !retryOverlay && guessOpen && (
+        <ModalCard title="Indovina il pH" onClose={() => setGuessOpen(false)}>
+          <PhSelector
+            value={guessSelection}
+            onChange={setGuessSelection}
+            showError={p2Touched && guessSelection === null}
+            helperText="Seleziona un valore tra 0 e 14"
+          />
+          <div className="button-row">
+            <button className="btn btn-primary" onClick={handleGuess}>
+              Invia
+            </button>
+            <button className="btn btn-ghost" onClick={() => setGuessOpen(false)}>
+              Annulla
+            </button>
+          </div>
+        </ModalCard>
+      )}
     </section>
+  );
+}
+
+function SceneFrame({ id, children }: { id: SceneState["id"]; children: ReactNode }) {
+  return <div className={`scene scene-${id} scene-enter`}>{children}</div>;
+}
+
+function IdleScene({ onQuickMatch, onHome }: { onQuickMatch: () => void; onHome: () => void }) {
+  return (
+    <div className="scene-card">
+      <div className="scene-title">Nessuna partita attiva</div>
+      <p className="scene-subtitle">Avvia una ricerca rapida per iniziare.</p>
+      <div className="button-stack">
+        <button className="btn btn-primary btn-large" onClick={onQuickMatch}>
+          Cerca partita
+        </button>
+        <button className="btn btn-ghost" onClick={onHome}>
+          Torna alla home
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function MatchmakingScene({ onCancel }: { onCancel: () => void }) {
+  return (
+    <div className="scene-card">
+      <div className="orbital">
+        <div className="orbital-core" />
+        <div className="orbital-ring" />
+      </div>
+      <div className="scene-title">Cerco un avversario</div>
+      <p className="scene-subtitle">Sto mescolando le provette. Restate connessi.</p>
+      <div className="wait-dots" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+      </div>
+      <button className="btn btn-ghost" onClick={onCancel}>
+        Torna alla home
+      </button>
+    </div>
+  );
+}
+
+function MatchFoundScene() {
+  return (
+    <div className="scene-card">
+      <div className="scene-badge success">Match trovato</div>
+      <div className="scene-title">Preparati</div>
+      <p className="scene-subtitle">Tra un attimo si parte con la missione.</p>
+    </div>
+  );
+}
+
+function P1ChoosePhScene({
+  selection,
+  onSelect,
+  onConfirm,
+  showError,
+  onTouched,
+}: {
+  selection: number | null;
+  onSelect: (value: number) => void;
+  onConfirm: () => void;
+  showError: boolean;
+  onTouched: () => void;
+}) {
+  return (
+    <div className="scene-card">
+      <div className="turn-chip active">Il tuo turno</div>
+      <div className="scene-title">Scegli il pH segreto</div>
+      <p className="scene-subtitle">Seleziona un valore tra 0 e 14.</p>
+      <PhSelector
+        value={selection}
+        onChange={onSelect}
+        showError={showError}
+        helperText="Seleziona un valore tra 0 e 14"
+      />
+      <div className="button-row">
+        <button
+          className="btn btn-primary btn-large"
+          onClick={() => {
+            onTouched();
+            onConfirm();
+          }}
+        >
+          Conferma pH
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function P1AnswerScene({
+  indicator,
+  onAnswer,
+  history,
+}: {
+  indicator: Indicator;
+  onAnswer: (category: "ACIDO" | "INTERMEDIO" | "BASICO") => void;
+  history: MatchState["history"];
+}) {
+  return (
+    <div className="scene-card">
+      <div className="turn-chip active">Il tuo turno</div>
+      <div className="scene-title">Rispondi all'indicatore</div>
+      <IndicatorCard indicator={indicator} variant="question" />
+      <div className="answer-grid">
+        <button className="btn btn-secondary" onClick={() => onAnswer("ACIDO")}>
+          Acido
+        </button>
+        <button className="btn btn-secondary" onClick={() => onAnswer("INTERMEDIO")}>
+          Intermedio
+        </button>
+        <button className="btn btn-secondary" onClick={() => onAnswer("BASICO")}>
+          Basico
+        </button>
+      </div>
+      <HistoryPanel history={history} />
+    </div>
+  );
+}
+
+function P2IndicatorScene({
+  search,
+  onSearch,
+  indicators,
+  onAsk,
+  onGuess,
+  history,
+}: {
+  search: string;
+  onSearch: (value: string) => void;
+  indicators: Indicator[];
+  onAsk: (indicator: Indicator) => void;
+  onGuess: () => void;
+  history: MatchState["history"];
+}) {
+  return (
+    <div className="scene-card">
+      <div className="turn-chip active">Il tuo turno</div>
+      <div className="scene-title">Scegli un indicatore</div>
+      <p className="scene-subtitle">Ogni carta e una domanda.</p>
+
+      <input
+        className="input search-input"
+        type="search"
+        placeholder="Cerca indicatore"
+        value={search}
+        onChange={(event) => onSearch(event.target.value)}
+      />
+
+      <div className="indicator-grid">
+        {indicators.length === 0 ? (
+          <div className="empty-state">Nessun indicatore trovato.</div>
+        ) : (
+          indicators.map((indicator) => (
+            <div key={indicator.id} className="indicator-item">
+              <IndicatorCard indicator={indicator} />
+              <button className="btn btn-primary" onClick={() => onAsk(indicator)}>
+                Chiedi
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="button-row">
+        <button className="btn btn-secondary" onClick={onGuess}>
+          Indovina pH
+        </button>
+      </div>
+
+      <HistoryPanel history={history} />
+    </div>
+  );
+}
+
+function WaitingScene({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <div className="scene-card">
+      <div className="scene-badge">In attesa</div>
+      <div className="scene-title">{title}</div>
+      <p className="scene-subtitle">{subtitle}</p>
+      <div className="wait-dots" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+      </div>
+    </div>
+  );
+}
+
+function PhSelector({
+  value,
+  onChange,
+  showError,
+  helperText,
+}: {
+  value: number | null;
+  onChange: (value: number) => void;
+  showError: boolean;
+  helperText: string;
+}) {
+  return (
+    <div className={`ph-selector ${showError ? "has-error" : ""}`}>
+      <div className="ph-grid">
+        {PH_VALUES.map((ph) => (
+          <button
+            key={ph}
+            type="button"
+            className={`ph-tile ${value === ph ? "selected" : ""}`}
+            onClick={() => onChange(ph)}
+            aria-pressed={value === ph}
+          >
+            {ph}
+          </button>
+        ))}
+      </div>
+      {showError && <div className="ph-helper">{helperText}</div>}
+    </div>
   );
 }
 
 function IndicatorCard({
   indicator,
-  compact,
   outcome,
   variant,
 }: {
   indicator: Indicator;
-  compact?: boolean;
   outcome?: string;
-  variant?: "history" | "question" | "list";
+  variant?: "question" | "history";
 }) {
   const acidColor = colorForName(indicator.acidColor);
   const baseColor = colorForName(indicator.baseColor);
@@ -539,15 +666,14 @@ function IndicatorCard({
   const baseIsClear = indicator.baseColor.toLowerCase() === "incolore";
   const classes = [
     "indicator-card",
-    compact ? "compact" : "",
-    variant ? `variant-${variant}` : "",
+    variant ? `indicator-${variant}` : "",
   ]
     .filter(Boolean)
     .join(" ");
 
   return (
     <div className={classes}>
-      <div className="indicator-top">
+      <div className="indicator-header">
         <div className="indicator-name">{indicator.name}</div>
         {outcome && (
           <span className={`outcome-badge ${outcome.toLowerCase()}`}>{outcome}</span>
@@ -569,163 +695,64 @@ function IndicatorCard({
           <span>Basica: {indicator.baseColor}</span>
         </div>
       </div>
-      <div className="indicator-footer">
-        <span className="range-pill">Viraggio: {indicator.low} - {indicator.high}</span>
-      </div>
+      <div className="indicator-footer">Viraggio: {indicator.low} - {indicator.high}</div>
     </div>
   );
 }
 
-function colorForName(name: string) {
-  const key = name.trim().toLowerCase();
-  const palette: Record<string, string> = {
-    rosso: "#d44a2c",
-    blu: "#2f64d6",
-    giallo: "#f4c400",
-    verde: "#2c9b5f",
-    fucsia: "#d6357c",
-    viola: "#7a4ccf",
-    arancione: "#f47a2f",
-    incolore: "#f8f8f8",
-  };
-  return palette[key] || "#c9c9c9";
+function HistoryPanel({ history }: { history: MatchState["history"] }) {
+  return (
+    <details className="history-panel">
+      <summary>Storico risposte convalidate</summary>
+      {history.length === 0 ? (
+        <div className="history-empty">Nessuna risposta valida ancora.</div>
+      ) : (
+        <div className="history-grid">
+          {history.map((item, index) => (
+            <IndicatorCard
+              key={`${item.indicatorId}-${index}`}
+              indicator={{
+                id: item.indicatorId,
+                name: item.indicatorName,
+                acidColor: item.acidColor,
+                baseColor: item.baseColor,
+                low: item.low,
+                high: item.high,
+              }}
+              outcome={item.outcome}
+              variant="history"
+            />
+          ))}
+        </div>
+      )}
+    </details>
+  );
 }
 
-function getActiveOverlay(params: {
-  matchState: MatchState | null;
-  ended: MatchEndedPayload | null;
-  isP1: boolean | null;
-  canAct: boolean;
-  searching: boolean;
-  matchFoundAt: number | null;
-  retryOverlay: { title: string; subtitle: string; role: "p1" | "p2" } | null;
-  graceSeconds: number | null;
-}) {
-  const {
-    matchState,
-    ended,
-    isP1,
-    canAct,
-    searching,
-    matchFoundAt,
-    retryOverlay,
-    graceSeconds,
-  } = params;
-
-  if (ended) {
-    return null;
-  }
-
-  if (retryOverlay) {
-    return {
-      kind: retryOverlay.role === "p1" ? "retry_p1" : "retry_p2",
-      title: retryOverlay.title,
-      subtitle: retryOverlay.subtitle,
-      actionLabel: "Riprova",
-      tone: "alert",
-      showSpinner: false,
-    } as const;
-  }
-
-  if (matchState?.opponent.graceEndsAt && !matchState.opponent.connected) {
-    return {
-      kind: "opponent_disconnect",
-      title: "Avversario disconnesso",
-      subtitle: `Rientro entro ${graceSeconds ?? 0}s`,
-      tone: "warning",
-      showSpinner: true,
-    } as const;
-  }
-
-  if (matchFoundAt) {
-    return {
-      kind: "found",
-      title: "Match trovato!",
-      subtitle: "Preparati, la partita sta iniziando.",
-      tone: "success",
-      showSpinner: false,
-    } as const;
-  }
-
-  if (!matchState) {
-    if (searching) {
-      return {
-        kind: "searching",
-        title: "Cerco un avversario",
-        subtitle: "Restate connessi, stiamo abbinando la partita.",
-        tone: "waiting",
-        showSpinner: true,
-      } as const;
-    }
-    return null;
-  }
-
-  if (!canAct) {
-    if (matchState.status === "waiting_p1_ph" && !isP1) {
-      return {
-        kind: "waiting_p1_ph",
-        title: "Attendi P1",
-        subtitle: "E' il turno dell'altro giocatore.",
-        tone: "waiting",
-        showSpinner: true,
-      } as const;
-    }
-
-    if (matchState.status === "in_progress" && isP1 && !matchState.pendingQuestion) {
-      return {
-        kind: "waiting_p2_question",
-        title: "Attendi la domanda",
-        subtitle: "E' il turno dell'altro giocatore.",
-        tone: "waiting",
-        showSpinner: true,
-      } as const;
-    }
-
-    if (matchState.status === "in_progress" && !isP1 && matchState.pendingQuestion) {
-      return {
-        kind: "waiting_p1_answer",
-        title: "P1 sta rispondendo",
-        subtitle: "E' il turno dell'altro giocatore.",
-        tone: "waiting",
-        showSpinner: true,
-      } as const;
-    }
-  }
-
-  return null;
-}
-
-function StateOverlay({
-  overlay,
-  onDismiss,
+function OverlayNotice({
+  tone,
+  title,
+  subtitle,
+  showSpinner,
+  actionLabel,
+  onAction,
 }: {
-  overlay: {
-    kind:
-      | "searching"
-      | "found"
-      | "waiting_p1_ph"
-      | "waiting_p2_question"
-      | "waiting_p1_answer"
-      | "opponent_disconnect"
-      | "retry_p1"
-      | "retry_p2";
-    title: string;
-    subtitle: string;
-    actionLabel?: string;
-    tone: "alert" | "warning" | "waiting" | "success";
-    showSpinner: boolean;
-  };
-  onDismiss: () => void;
+  tone: "alert" | "warning" | "success" | "info";
+  title: string;
+  subtitle: string;
+  showSpinner?: boolean;
+  actionLabel?: string;
+  onAction?: () => void;
 }) {
   return (
-    <div className="game-overlay">
-      <div className={`overlay-card tone-${overlay.tone}`}>
-        {overlay.showSpinner ? <div className="spinner" /> : <div className="overlay-icon" />}
-        <h3>{overlay.title}</h3>
-        <p>{overlay.subtitle}</p>
-        {overlay.actionLabel && (
-          <button className="secondary" onClick={onDismiss}>
-            {overlay.actionLabel}
+    <div className="modal-backdrop">
+      <div className={`modal-card tone-${tone}`} role="dialog" aria-live="polite">
+        {showSpinner ? <div className="spinner" /> : <div className="modal-icon" />}
+        <div className="modal-title">{title}</div>
+        <p className="modal-subtitle">{subtitle}</p>
+        {actionLabel && onAction && (
+          <button className="btn btn-secondary" onClick={onAction}>
+            {actionLabel}
           </button>
         )}
       </div>
@@ -733,7 +760,29 @@ function StateOverlay({
   );
 }
 
-function GameHud({
+function ModalCard({
+  title,
+  children,
+  onClose,
+}: {
+  title: string;
+  children: ReactNode;
+  onClose: () => void;
+}) {
+  return (
+    <div className="modal-backdrop">
+      <div className="modal-card" role="dialog" aria-live="polite">
+        <div className="modal-title">{title}</div>
+        {children}
+        <button className="modal-close" onClick={onClose} aria-label="Chiudi">
+          x
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function MatchHud({
   role,
   nickname,
   opponentNickname,
@@ -743,6 +792,9 @@ function GameHud({
   opponentConnected,
   graceSeconds,
   scorePulse,
+  yourPenalty,
+  canGiveUp,
+  onGiveUp,
 }: {
   role: "P1" | "P2";
   nickname: string;
@@ -753,33 +805,44 @@ function GameHud({
   opponentConnected: boolean;
   graceSeconds: number | null;
   scorePulse: { you: boolean; opponent: boolean };
+  yourPenalty: number;
+  canGiveUp: boolean;
+  onGiveUp: () => void;
 }) {
   return (
-    <div className="game-hud">
-      <div className="hud-role">
-        <span className="role-badge">{role}</span>
-        <div className="hud-name">{nickname}</div>
-        <div className="hud-sub">vs {opponentNickname}</div>
+    <div className="match-hud">
+      <div className="hud-left">
+        <div className="role-badge">{role}</div>
+        <div className="hud-names">
+          <div className="hud-you">{nickname}</div>
+          <div className="hud-vs">contro {opponentNickname}</div>
+        </div>
       </div>
       <div className="hud-scores">
-        <div className={`hud-score ${scorePulse.you ? "pop" : ""}`}>
-          <div className="hud-score-label">TU</div>
-          <div className="hud-score-value">{yourScore}</div>
+        <div className={`score-pill ${scorePulse.you ? "pop" : ""}`}>
+          <div className="score-label">TU</div>
+          <div className="score-value">{yourScore}</div>
         </div>
-        <div className={`hud-score ${scorePulse.opponent ? "pop" : ""}`}>
-          <div className="hud-score-label">AVV</div>
-          <div className="hud-score-value">{opponentScore}</div>
+        <div className={`score-pill ${scorePulse.opponent ? "pop" : ""}`}>
+          <div className="score-label">AVV</div>
+          <div className="score-value">{opponentScore}</div>
         </div>
       </div>
       <div className="hud-meta">
-        <div className="hud-questions">Domande (a): {questionsCount}</div>
+        <div className="hud-meta-line">Domande: {questionsCount}</div>
+        <div className="hud-meta-line">Penalita: -{yourPenalty}</div>
         <div className={`hud-connection ${opponentConnected ? "ok" : "down"}`}>
           <span className="status-dot" />
-          {opponentConnected
-            ? "Avversario connesso"
-            : `Disconnesso ${graceSeconds ?? 0}s`}
+          {opponentConnected ? "Avversario connesso" : `Disconnesso ${graceSeconds ?? 0}s`}
         </div>
       </div>
+      {canGiveUp && (
+        <div className="hud-actions">
+          <button className="btn btn-danger" onClick={onGiveUp}>
+            Arrenditi
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -808,6 +871,7 @@ function EndScreen({
 
   return (
     <div className="end-screen">
+      {isWinner && <ConfettiBurst />}
       <div className="end-card">
         <div className="end-title">{title}</div>
         <div className="end-reason">{reason}</div>
@@ -821,14 +885,14 @@ function EndScreen({
             <div className="score">{opponentScore}</div>
           </div>
         </div>
-        <div className="end-actions">
-          <button className="primary" onClick={onQuickMatch}>
+        <div className="button-stack">
+          <button className="btn btn-primary" onClick={onQuickMatch}>
             Gioca ancora
           </button>
-          <button className="secondary" onClick={onHome}>
+          <button className="btn btn-secondary" onClick={onHome}>
             Torna alla home
           </button>
-          <button className="ghost" onClick={onLeaderboard}>
+          <button className="btn btn-ghost" onClick={onLeaderboard}>
             Classifica
           </button>
         </div>
@@ -837,37 +901,39 @@ function EndScreen({
   );
 }
 
-function formatEndReason(reason: string) {
-  switch (reason) {
-    case "p2_guess_correct":
-      return "Indovinato il pH";
-    case "give_up":
-      return "Resa";
-    case "disconnect_forfeit":
-      return "Disconnessione";
-    default:
-      return "Partita terminata";
-  }
+function ConfettiBurst() {
+  const pieces = useMemo(
+    () =>
+      Array.from({ length: 20 }, (_, index) => ({
+        left: `${5 + (index * 9) % 90}%`,
+        delay: `${(index % 6) * 0.12}s`,
+        duration: `${2.2 + (index % 5) * 0.3}s`,
+        hue: `${(index * 32) % 360}`,
+      })),
+    []
+  );
+
+  return (
+    <div className="confetti" aria-hidden="true">
+      {pieces.map((piece, index) => (
+        <span
+          key={index}
+          className="confetti-piece"
+          style={
+            {
+              "--x": piece.left,
+              "--delay": piece.delay,
+              "--duration": piece.duration,
+              "--hue": piece.hue,
+            } as CSSProperties
+          }
+        />
+      ))}
+    </div>
+  );
 }
 
-function getPhValidation(value: string, touched: boolean) {
-  const trimmed = value.trim();
-  const parsed = Number(trimmed);
-  const isValid =
-    trimmed.length > 0 && Number.isInteger(parsed) && parsed >= 0 && parsed <= 14;
-
-  return {
-    isValid,
-    showError: touched && !isValid,
-    message: "Inserisci un numero intero tra 0 e 14",
-  };
-}
-
-function ToastStack({
-  toasts,
-}: {
-  toasts: { id: string; message: string; level: "info" | "warn" | "error" }[];
-}) {
+function ToastStack({ toasts }: { toasts: Toast[] }) {
   return (
     <div className="toast-stack">
       {toasts.map((toast) => (
@@ -896,25 +962,106 @@ function DebugPanel({ events }: { events: string[] }) {
   );
 }
 
-function createToastHandler(setToasts: Dispatch<SetStateAction<
-  { id: string; message: string; level: "info" | "warn" | "error" }[]
->>) {
+function formatEndReason(reason: string) {
+  switch (reason) {
+    case "p2_guess_correct":
+      return "Indovinato il pH";
+    case "give_up":
+      return "Resa";
+    case "disconnect_forfeit":
+      return "Disconnessione";
+    default:
+      return "Partita terminata";
+  }
+}
+
+function resolveScene({
+  matchState,
+  searching,
+  matchFoundAt,
+  isP1,
+}: {
+  matchState: MatchState | null;
+  searching: boolean;
+  matchFoundAt: number | null;
+  isP1: boolean | null;
+}): SceneState {
+  if (matchFoundAt) {
+    return { id: "match_found" };
+  }
+
+  if (!matchState) {
+    if (searching) {
+      return { id: "matchmaking" };
+    }
+    return { id: "idle" };
+  }
+
+  if (matchState.status === "waiting_p1_ph") {
+    if (isP1) {
+      return { id: "p1_choose_ph" };
+    }
+    return {
+      id: "waiting",
+      title: "P1 sta scegliendo il pH",
+      subtitle: "Preparati, il tuo turno sta arrivando.",
+    };
+  }
+
+  if (matchState.status === "in_progress") {
+    if (matchState.pendingQuestion) {
+      if (isP1) {
+        return { id: "p1_answer_indicator" };
+      }
+      return {
+        id: "waiting",
+        title: "P1 sta rispondendo",
+        subtitle: "La risposta e in arrivo.",
+      };
+    }
+
+    if (isP1) {
+      return {
+        id: "waiting",
+        title: "In attesa della domanda",
+        subtitle: "P2 sta scegliendo l'indicatore.",
+      };
+    }
+
+    return { id: "p2_choose_indicator" };
+  }
+
+  return { id: "idle" };
+}
+
+function colorForName(name: string) {
+  const key = name.trim().toLowerCase();
+  const palette: Record<string, string> = {
+    rosso: "#d44a2c",
+    blu: "#2f64d6",
+    giallo: "#f4c400",
+    verde: "#2c9b5f",
+    fucsia: "#d6357c",
+    viola: "#7a4ccf",
+    arancione: "#f47a2f",
+    incolore: "#f8f8f8",
+  };
+  return palette[key] || "#c9c9c9";
+}
+
+function createToastHandler(setToasts: Dispatch<SetStateAction<Toast[]>>) {
   return (message: string, level: "info" | "warn" | "error") => {
     const id = `${Date.now()}-${Math.random()}`;
     setToasts((prev) => [...prev, { id, message, level }].slice(-3));
     window.setTimeout(() => {
       setToasts((prev) => prev.filter((toast) => toast.id !== id));
-    }, 3500);
+    }, 3200);
   };
 }
 
 function createNotificationHandler(
   pushToast: (message: string, level: "info" | "warn" | "error") => void,
-  setRetryOverlay: Dispatch<SetStateAction<{
-    title: string;
-    subtitle: string;
-    role: "p1" | "p2";
-  } | null>>,
+  setRetryOverlay: Dispatch<SetStateAction<RetryOverlay | null>>,
   setSearching: Dispatch<SetStateAction<boolean>>
 ) {
   return (message: string, level: "info" | "warn" | "error") => {
@@ -959,14 +1106,8 @@ function createToastHelpers({
   setRetryOverlay,
   setSearching,
 }: {
-  setToasts: Dispatch<SetStateAction<
-    { id: string; message: string; level: "info" | "warn" | "error" }[]
-  >>;
-  setRetryOverlay: Dispatch<SetStateAction<{
-    title: string;
-    subtitle: string;
-    role: "p1" | "p2";
-  } | null>>;
+  setToasts: Dispatch<SetStateAction<Toast[]>>;
+  setRetryOverlay: Dispatch<SetStateAction<RetryOverlay | null>>;
   setSearching: Dispatch<SetStateAction<boolean>>;
 }) {
   const pushToast = createToastHandler(setToasts);

@@ -4,7 +4,7 @@ import {
   SocketServerToClientEvents,
 } from "@shared/types";
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:3000";
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL ?? "http://localhost:3000";
 
 let socket: Socket<SocketServerToClientEvents, SocketClientToServerEvents> | null = null;
 

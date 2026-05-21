@@ -1,4 +1,4 @@
-82.165.238.8 {
+82.165.238.8.sslip.io {
     root * /usr/share/caddy
     file_server
 

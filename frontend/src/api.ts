@@ -1,4 +1,7 @@
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
+const defaultOrigin =
+  typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
+const defaultApiUrl = import.meta.env.PROD ? defaultOrigin : "http://localhost:3000";
+const API_URL = (import.meta.env.VITE_API_URL || defaultApiUrl).replace(/\/+$/, "");
 
 export type LeaderboardEntry = {
   playerId: string;

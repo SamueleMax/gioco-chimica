@@ -1,23 +1,19 @@
 82.165.238.8.sslip.io {
+  encode gzip zstd
+
+  @api path /api/*
+  handle @api {
+    reverse_proxy backend:3000
+  }
+
+  @socket path /socket.io/*
+  handle @socket {
+    reverse_proxy backend:3000
+  }
+
+  handle {
     root * /usr/share/caddy
-    file_server
-
-    # Proxies front-end API requests seamlessly to the Fastify container
-    handle_path /api/* {
-        reverse_proxy backend:3000
-    }
-
-    handle /socket.io/* {
-        reverse_proxy backend:3000 {
-            # Let the backend see the actual requested domain context
-            header_up Host {upstream_hostport}
-            
-            # Keep WebSockets alive and transparent
-            header_up Upgrade {>Upgrade}
-            header_up Connection {>Connection}
-        }
-    }
-
-    # Crucial for React Router (SPA) to prevent 404s on page refreshes
     try_files {path} /index.html
+    file_server
+  }
 }

@@ -4,7 +4,10 @@ import {
   SocketServerToClientEvents,
 } from "@shared/types";
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL ?? "http://localhost:3000";
+const defaultOrigin =
+  typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
+const defaultSocketUrl = import.meta.env.PROD ? defaultOrigin : "http://localhost:3000";
+const SOCKET_URL = (import.meta.env.VITE_SOCKET_URL || defaultSocketUrl).replace(/\/+$/, "");
 
 let socket: Socket<SocketServerToClientEvents, SocketClientToServerEvents> | null = null;
 

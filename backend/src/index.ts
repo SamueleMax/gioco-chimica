@@ -109,7 +109,10 @@ function buildMatchState(match: ActiveMatch, playerId: string, indicators: Indic
 }
 
 async function start() {
-  const app = Fastify({ logger: true });
+  const app = Fastify({
+    logger: true,
+    trustProxy: true
+  });
   await app.register(cors, { origin: true });
 
   const indicators = await getIndicators();

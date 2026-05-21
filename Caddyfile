@@ -9,6 +9,10 @@
 
     handle /socket.io/* {
         reverse_proxy backend:3000 {
+            # Let the backend see the actual requested domain context
+            header_up Host {upstream_hostport}
+            
+            # Keep WebSockets alive and transparent
             header_up Upgrade {>Upgrade}
             header_up Connection {>Connection}
         }

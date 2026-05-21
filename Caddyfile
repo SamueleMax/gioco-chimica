@@ -7,6 +7,13 @@
         reverse_proxy backend:3000
     }
 
+    handle /socket.io/* {
+        reverse_proxy backend:3000 {
+            header_up Upgrade {>Upgrade}
+            header_up Connection {>Connection}
+        }
+    }
+
     # Crucial for React Router (SPA) to prevent 404s on page refreshes
     try_files {path} /index.html
 }

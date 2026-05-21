@@ -335,7 +335,7 @@ async function start() {
       }
 
       if (waitingQueue.includes(playerId)) {
-        socket.emit("match:notification", { message: "Sei gia in attesa", level: "info" });
+        socket.emit("match:notification", { message: "Sei già in attesa", level: "info" });
         return;
       }
 
@@ -440,7 +440,7 @@ async function start() {
         return;
       }
       if (match.p1Ph !== null) {
-        emitNotification(match, playerId, "pH gia impostato", "warn");
+        emitNotification(match, playerId, "pH già impostato", "warn");
         return;
       }
 

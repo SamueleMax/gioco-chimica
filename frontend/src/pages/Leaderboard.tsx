@@ -8,9 +8,33 @@ export default function LeaderboardPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetchLeaderboard()
-      .then((data) => setEntries(data))
-      .catch(() => setError("Impossibile caricare la classifica"));
+    let cancelled = false;
+
+    const loadLeaderboard = async (isInitial: boolean) => {
+      try {
+        const data = await fetchLeaderboard();
+        if (cancelled) {
+          return;
+        }
+        setEntries(data);
+        setError("");
+      } catch (err) {
+        if (cancelled) {
+          return;
+        }
+        setError(
+          isInitial ? "Impossibile caricare la classifica" : "Impossibile aggiornare la classifica"
+        );
+      }
+    };
+
+    loadLeaderboard(true);
+    const interval = window.setInterval(() => loadLeaderboard(false), 5000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
   }, []);
 
   return (

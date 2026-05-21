@@ -1,0 +1,12 @@
+82.165.238.8 {
+    root * /usr/share/caddy
+    file_server
+
+    # Proxies front-end API requests seamlessly to the Fastify container
+    handle_path /api/* {
+        reverse_proxy backend:3000
+    }
+
+    # Crucial for React Router (SPA) to prevent 404s on page refreshes
+    try_files {path} /index.html
+}

@@ -1,22 +1,86 @@
 @import url("https://fonts.googleapis.com/css2?family=Bangers&family=Nunito:wght@400;600;700;800&display=swap");
 
 :root {
-  --bg-1: #0b1020;
-  --bg-2: #12233f;
-  --bg-3: #1a3556;
-  --card: rgba(16, 24, 44, 0.92);
-  --card-strong: rgba(20, 30, 56, 0.96);
-  --text: #f8f4ea;
-  --muted: #c9c2b6;
-  --accent: #ff914d;
-  --accent-2: #3ad4c6;
-  --accent-3: #ffd86a;
-  --danger: #ff6b6b;
-  --success: #41d99a;
-  --shadow: 0 18px 40px rgba(5, 10, 22, 0.45);
+  --bg-1: #f7f5ef;
+  --bg-2: #f4f9ff;
+  --bg-3: #fff1df;
+  --bg-spot-1: rgba(255, 209, 102, 0.45);
+  --bg-spot-2: rgba(46, 196, 182, 0.35);
+  --card: rgba(255, 255, 255, 0.96);
+  --card-strong: #ffffff;
+  --text: #1f2a37;
+  --muted: #5b6472;
+  --accent: #ff8a3d;
+  --accent-2: #2ec4b6;
+  --accent-3: #ffd166;
+  --danger: #e34c4c;
+  --success: #2fbf71;
+  --shadow: 0 16px 32px rgba(42, 60, 82, 0.18);
+  --shadow-strong: 0 20px 42px rgba(42, 60, 82, 0.22);
   --radius: 22px;
   --font-display: "Bangers", cursive;
   --font-body: "Nunito", sans-serif;
+  --border-soft: rgba(31, 42, 55, 0.12);
+  --border-strong: rgba(31, 42, 55, 0.2);
+  --grid-dot: rgba(31, 42, 55, 0.08);
+  --field-bg: #ffffff;
+  --field-border: rgba(31, 42, 55, 0.18);
+  --field-focus: rgba(255, 138, 61, 0.35);
+  --chip-bg: rgba(255, 209, 102, 0.35);
+  --chip-text: #7a4a12;
+  --ghost-border: rgba(31, 42, 55, 0.2);
+  --ghost-bg: rgba(255, 255, 255, 0.7);
+  --alert-error-bg: rgba(255, 107, 107, 0.18);
+  --alert-error-border: rgba(227, 76, 76, 0.45);
+  --alert-error-text: #9b2f2f;
+  --alert-info-bg: rgba(46, 196, 182, 0.18);
+  --alert-info-border: rgba(46, 196, 182, 0.45);
+  --alert-info-text: #1f6d64;
+  --tile-bg: rgba(255, 255, 255, 0.85);
+  --tile-active: linear-gradient(135deg, #ffd166, #ff9a4e);
+  --hud-bg: rgba(255, 255, 255, 0.92);
+  --modal-backdrop: rgba(246, 249, 255, 0.86);
+  --modal-shadow: 0 22px 40px rgba(42, 60, 82, 0.24);
+  --toast-bg: rgba(255, 255, 255, 0.95);
+  --toast-border: rgba(31, 42, 55, 0.18);
+  --debug-bg: rgba(255, 255, 255, 0.92);
+  --indicator-bg: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.98),
+    rgba(245, 248, 255, 0.98)
+  );
+  --indicator-bg-alt: rgba(249, 250, 255, 0.96);
+  --badge-bg: rgba(31, 42, 55, 0.08);
+  --scene-badge-bg: rgba(31, 42, 55, 0.08);
+  --scene-badge-success-bg: rgba(47, 191, 113, 0.18);
+  --success-text: #1b6a44;
+  --turn-chip-bg: rgba(31, 42, 55, 0.08);
+  --turn-chip-active-bg: rgba(255, 209, 102, 0.35);
+  --turn-chip-active-text: #8a5a12;
+  --score-pill-bg: rgba(255, 255, 255, 0.9);
+  --score-pill-border: rgba(31, 42, 55, 0.12);
+  --divider: rgba(31, 42, 55, 0.12);
+  --swatch-border: rgba(31, 42, 55, 0.25);
+  --outcome-acid: rgba(255, 125, 78, 0.95);
+  --outcome-neutral: rgba(46, 196, 182, 0.95);
+  --outcome-base: rgba(90, 160, 255, 0.95);
+  --text-on-accent: #1f2a37;
+  --shadow-button: 0 10px 18px rgba(42, 60, 82, 0.18);
+  --surface-muted: #f1f5ff;
+  --end-card-bg: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.98),
+    rgba(242, 247, 255, 0.98)
+  );
+  --btn-primary: linear-gradient(135deg, #ff9a4e, #ff6f4c);
+  --btn-secondary: linear-gradient(135deg, #45d1c5, #54b6ff);
+  --btn-danger: linear-gradient(135deg, #ff8b8b, #ff5b5b);
+  --warning-border: rgba(255, 209, 102, 0.7);
+  --highlight-shadow: 0 16px 30px rgba(255, 209, 102, 0.2);
+  --indicator-glow: 0 0 20px rgba(255, 209, 102, 0.2);
+  --status-ok-glow: 0 0 8px rgba(46, 196, 182, 0.55);
+  --status-down-glow: 0 0 8px rgba(227, 76, 76, 0.55);
+  --alert-error-glow: 0 0 0 2px rgba(227, 76, 76, 0.2);
 }
 
 * {
@@ -29,8 +93,8 @@ body {
   font-family: var(--font-body);
   color: var(--text);
   background:
-    radial-gradient(circle at 15% 10%, rgba(255, 216, 106, 0.25), transparent 45%),
-    radial-gradient(circle at 85% 20%, rgba(58, 212, 198, 0.25), transparent 50%),
+    radial-gradient(circle at 15% 10%, var(--bg-spot-1), transparent 45%),
+    radial-gradient(circle at 85% 20%, var(--bg-spot-2), transparent 50%),
     linear-gradient(160deg, var(--bg-1), var(--bg-2) 50%, var(--bg-3) 100%);
   position: relative;
 }
@@ -39,7 +103,7 @@ body::before {
   content: "";
   position: fixed;
   inset: 0;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  background-image: radial-gradient(var(--grid-dot) 1px, transparent 1px);
   background-size: 22px 22px;
   opacity: 0.14;
   pointer-events: none;
@@ -80,7 +144,7 @@ button {
   background: var(--card);
   border-radius: var(--radius);
   padding: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-soft);
   box-shadow: var(--shadow);
 }
 
@@ -95,14 +159,14 @@ button {
   width: 100%;
   padding: 12px 14px;
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(9, 14, 28, 0.6);
+  border: 1px solid var(--field-border);
+  background: var(--field-bg);
   color: var(--text);
   font-size: 16px;
 }
 
 .input:focus {
-  outline: 2px solid rgba(255, 216, 106, 0.45);
+  outline: 2px solid var(--field-focus);
   outline-offset: 1px;
 }
 
@@ -119,15 +183,15 @@ button {
 }
 
 .inline-alert.error {
-  background: rgba(255, 107, 107, 0.18);
-  color: #ffb2b2;
-  border: 1px solid rgba(255, 107, 107, 0.6);
+  background: var(--alert-error-bg);
+  color: var(--alert-error-text);
+  border: 1px solid var(--alert-error-border);
 }
 
 .inline-alert.info {
-  background: rgba(58, 212, 198, 0.18);
-  color: #b2f0e7;
-  border: 1px solid rgba(58, 212, 198, 0.6);
+  background: var(--alert-info-bg);
+  color: var(--alert-info-text);
+  border: 1px solid var(--alert-info-border);
 }
 
 .btn {
@@ -137,9 +201,9 @@ button {
   font-size: 16px;
   font-weight: 700;
   cursor: pointer;
-  color: #1a1420;
+  color: var(--text-on-accent);
   transition: transform 0.15s ease, box-shadow 0.2s ease;
-  box-shadow: 0 10px 20px rgba(6, 12, 26, 0.3);
+  box-shadow: var(--shadow-button);
 }
 
 .btn:active {
@@ -157,27 +221,27 @@ button {
 .ph-tile:focus-visible,
 .stepper-btn:focus-visible,
 .modal-close:focus-visible {
-  outline: 2px solid rgba(255, 216, 106, 0.6);
+  outline: 2px solid var(--field-focus);
   outline-offset: 2px;
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #ff994f, #ff6b4a);
+  background: var(--btn-primary);
 }
 
 .btn-secondary {
-  background: linear-gradient(135deg, #3ad4c6, #22b0d6);
+  background: var(--btn-secondary);
 }
 
 .btn-ghost {
   background: transparent;
   color: var(--text);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid var(--ghost-border);
   box-shadow: none;
 }
 
 .btn-danger {
-  background: linear-gradient(135deg, #ff7b7b, #ff4d4d);
+  background: var(--btn-danger);
 }
 
 .btn-large {
@@ -201,7 +265,7 @@ button {
 .badge {
   padding: 6px 12px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--badge-bg);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.3px;
@@ -240,7 +304,7 @@ button {
 }
 
 .home-step {
-  background: rgba(18, 26, 46, 0.85);
+  background: var(--surface-muted);
 }
 
 .step-title {
@@ -261,15 +325,15 @@ button {
 }
 
 .leaderboard-item.top {
-  border-color: rgba(255, 216, 106, 0.6);
-  box-shadow: 0 16px 30px rgba(255, 216, 106, 0.2);
+  border-color: var(--warning-border);
+  box-shadow: var(--highlight-shadow);
 }
 
 .rank-badge {
   width: 54px;
   height: 54px;
   border-radius: 16px;
-  background: rgba(255, 216, 106, 0.2);
+  background: var(--chip-bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -321,7 +385,7 @@ button {
   height: 48px;
   border-radius: 16px;
   border: none;
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--tile-bg);
   color: var(--text);
   font-size: 20px;
   font-weight: 700;
@@ -334,13 +398,13 @@ button {
   font-weight: 800;
   padding: 10px 0;
   border-radius: 16px;
-  background: rgba(9, 14, 28, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: var(--field-bg);
+  border: 1px solid var(--border-soft);
 }
 
 .divider {
   height: 1px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--divider);
   margin: 12px 0;
 }
 
@@ -351,10 +415,10 @@ button {
 .match-hud {
   display: grid;
   gap: 14px;
-  background: var(--card-strong);
+  background: var(--hud-bg);
   padding: 16px;
   border-radius: var(--radius);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--border-soft);
   box-shadow: var(--shadow);
   margin-bottom: 16px;
 }
@@ -369,8 +433,8 @@ button {
   width: 56px;
   height: 36px;
   border-radius: 18px;
-  background: rgba(255, 216, 106, 0.3);
-  color: #1a1420;
+  background: var(--chip-bg);
+  color: var(--text);
   font-family: var(--font-display);
   letter-spacing: 1px;
   display: flex;
@@ -399,11 +463,11 @@ button {
 }
 
 .score-pill {
-  background: rgba(9, 14, 28, 0.6);
+  background: var(--score-pill-bg);
   border-radius: 16px;
   padding: 10px;
   text-align: center;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--score-pill-border);
 }
 
 .score-pill.pop {
@@ -450,12 +514,12 @@ button {
   height: 10px;
   border-radius: 50%;
   background: var(--accent-2);
-  box-shadow: 0 0 8px rgba(58, 212, 198, 0.8);
+  box-shadow: var(--status-ok-glow);
 }
 
 .hud-connection.down .status-dot {
   background: var(--danger);
-  box-shadow: 0 0 8px rgba(255, 107, 107, 0.8);
+  box-shadow: var(--status-down-glow);
 }
 
 .hud-actions {
@@ -480,7 +544,7 @@ button {
   margin: 0 auto;
   background: var(--card);
   border-radius: var(--radius);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-soft);
   padding: 24px;
   text-align: center;
   display: grid;
@@ -503,15 +567,15 @@ button {
   justify-self: center;
   padding: 6px 14px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--scene-badge-bg);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.4px;
 }
 
 .scene-badge.success {
-  background: rgba(65, 217, 154, 0.2);
-  color: #baf6d8;
+  background: var(--scene-badge-success-bg);
+  color: var(--success-text);
 }
 
 .turn-chip {
@@ -519,12 +583,12 @@ button {
   padding: 6px 16px;
   border-radius: 999px;
   font-weight: 700;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--turn-chip-bg);
 }
 
 .turn-chip.active {
-  background: rgba(255, 216, 106, 0.25);
-  color: #fbe7a1;
+  background: var(--turn-chip-active-bg);
+  color: var(--turn-chip-active-text);
 }
 
 .orbital {
@@ -549,7 +613,7 @@ button {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  border: 2px dashed rgba(255, 255, 255, 0.25);
+  border: 2px dashed var(--border-strong);
   animation: spin 4s linear infinite;
 }
 
@@ -576,15 +640,15 @@ button {
 }
 
 .ph-selector {
-  background: rgba(9, 14, 28, 0.6);
+  background: var(--field-bg);
   border-radius: 18px;
   padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid var(--border-soft);
 }
 
 .ph-selector.has-error {
-  border-color: rgba(255, 107, 107, 0.8);
-  box-shadow: 0 0 0 2px rgba(255, 107, 107, 0.2);
+  border-color: var(--alert-error-border);
+  box-shadow: var(--alert-error-glow);
 }
 
 .ph-grid {
@@ -597,7 +661,7 @@ button {
   border: none;
   border-radius: 14px;
   padding: 12px 0;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--tile-bg);
   color: var(--text);
   font-weight: 700;
   cursor: pointer;
@@ -605,16 +669,16 @@ button {
 }
 
 .ph-tile.selected {
-  background: linear-gradient(135deg, #ffd86a, #ff9a4e);
-  color: #1a1420;
+  background: var(--tile-active);
+  color: var(--text-on-accent);
 }
 
 .ph-helper {
   margin-top: 10px;
   padding: 10px;
   border-radius: 12px;
-  background: rgba(255, 107, 107, 0.18);
-  color: #ffc2c2;
+  background: var(--alert-error-bg);
+  color: var(--alert-error-text);
   font-weight: 600;
 }
 
@@ -635,22 +699,22 @@ button {
 }
 
 .indicator-card {
-  background: linear-gradient(160deg, rgba(26, 36, 68, 0.95), rgba(10, 16, 36, 0.95));
+  background: var(--indicator-bg);
   border-radius: 18px;
   padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--border-soft);
   text-align: left;
   display: grid;
   gap: 10px;
 }
 
 .indicator-card.indicator-question {
-  border-color: rgba(255, 216, 106, 0.7);
-  box-shadow: 0 0 20px rgba(255, 216, 106, 0.2);
+  border-color: var(--warning-border);
+  box-shadow: var(--indicator-glow);
 }
 
 .indicator-card.indicator-history {
-  background: rgba(16, 22, 42, 0.92);
+  background: var(--indicator-bg-alt);
 }
 
 .indicator-header {
@@ -682,7 +746,7 @@ button {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  border: 1px solid var(--swatch-border);
 }
 
 .swatch-color.is-clear {
@@ -698,7 +762,7 @@ button {
 .indicator-footer {
   font-size: 13px;
   font-weight: 600;
-  color: #f4e9d0;
+  color: var(--muted);
 }
 
 .outcome-badge {
@@ -706,27 +770,27 @@ button {
   border-radius: 999px;
   font-size: 11px;
   font-weight: 700;
-  color: #1a1420;
+  color: var(--text-on-accent);
   text-transform: uppercase;
   letter-spacing: 0.4px;
 }
 
 .outcome-badge.acido {
-  background: rgba(255, 125, 78, 0.95);
+  background: var(--outcome-acid);
 }
 
 .outcome-badge.intermedio {
-  background: rgba(58, 212, 198, 0.95);
+  background: var(--outcome-neutral);
 }
 
 .outcome-badge.basico {
-  background: rgba(100, 176, 255, 0.95);
+  background: var(--outcome-base);
 }
 
 .empty-state {
   padding: 14px;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--surface-muted);
   color: var(--muted);
 }
 
@@ -754,7 +818,7 @@ button {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(7, 10, 20, 0.7);
+  background: var(--modal-backdrop);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -774,23 +838,23 @@ button {
   display: grid;
   gap: 12px;
   position: relative;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: var(--shadow);
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--modal-shadow);
 }
 
 .modal-card.tone-alert {
-  border-color: rgba(255, 107, 107, 0.6);
+  border-color: var(--alert-error-border);
 }
 
 .modal-card.tone-warning {
-  border-color: rgba(255, 216, 106, 0.6);
+  border-color: var(--warning-border);
 }
 
 .modal-icon {
   width: 36px;
   height: 36px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #ffd86a, #ff8b38);
+  background: linear-gradient(135deg, var(--accent-3), var(--accent));
   margin: 0 auto;
 }
 
@@ -809,7 +873,7 @@ button {
   top: 12px;
   right: 12px;
   border: none;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--ghost-bg);
   color: var(--text);
   width: 28px;
   height: 28px;
@@ -821,7 +885,7 @@ button {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  border: 3px solid rgba(255, 255, 255, 0.2);
+  border: 3px solid var(--border-soft);
   border-top-color: var(--accent-3);
   animation: spin 1s linear infinite;
   margin: 0 auto;
@@ -838,19 +902,20 @@ button {
 }
 
 .toast {
-  background: rgba(16, 22, 40, 0.92);
+  background: var(--toast-bg);
   border-radius: 14px;
   padding: 10px 14px;
   font-size: 13px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--toast-border);
+  color: var(--text);
 }
 
 .toast.warn {
-  border-color: rgba(255, 216, 106, 0.8);
+  border-color: var(--warning-border);
 }
 
 .toast.error {
-  border-color: rgba(255, 107, 107, 0.8);
+  border-color: var(--alert-error-border);
 }
 
 .debug-panel {
@@ -858,8 +923,8 @@ button {
   left: 18px;
   bottom: 18px;
   width: 260px;
-  background: rgba(10, 12, 26, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: var(--debug-bg);
+  border: 1px solid var(--border-soft);
   border-radius: 12px;
   padding: 12px;
   font-size: 11px;
@@ -892,14 +957,14 @@ button {
 }
 
 .end-card {
-  background: linear-gradient(160deg, rgba(28, 36, 72, 0.95), rgba(10, 14, 34, 0.95));
+  background: var(--end-card-bg);
   padding: 32px;
   border-radius: 22px;
   text-align: center;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-strong);
   max-width: 480px;
   width: 100%;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--border-soft);
   display: grid;
   gap: 14px;
 }
@@ -907,7 +972,33 @@ button {
 .end-title {
   font-family: var(--font-display);
   font-size: 34px;
-  color: var(--accent-3);
+  color: var(--accent);
+}
+
+.reveal-backdrop {
+  z-index: 50;
+}
+
+.reveal-card {
+  max-width: 460px;
+  gap: 10px;
+}
+
+.reveal-indicator {
+  font-weight: 800;
+  font-size: 18px;
+}
+
+.reveal-outcome {
+  display: flex;
+  justify-content: center;
+}
+
+.reveal-swatches {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .end-reason {

@@ -11,6 +11,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import {
   Indicator,
+  HistoryItem,
   MatchEndedPayload,
   MatchNotification,
   MatchState,
@@ -59,7 +60,11 @@ export default function MatchPage() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [scorePulse, setScorePulse] = useState({ you: false, opponent: false });
   const [guessOpen, setGuessOpen] = useState(false);
+  const [revealAnswer, setRevealAnswer] = useState<HistoryItem | null>(null);
   const prevScores = useRef({ you: 0, opponent: 0 });
+  const prevHistoryLength = useRef<number | null>(null);
+  const activeMatchId = useRef<string | null>(null);
+  const revealTimer = useRef<number | null>(null);
   const [debugEvents, setDebugEvents] = useState<string[]>([]);
   const debugEnabled = import.meta.env.VITE_DEBUG === "true";
 
@@ -282,6 +287,9 @@ export default function MatchPage() {
   const isDisconnected = Boolean(
     matchState?.opponent.graceEndsAt && !matchState.opponent.connected
   );
+  const showReveal = Boolean(
+    revealAnswer && !ended && !isDisconnected && matchState?.status !== "ended"
+  );
 
   useEffect(() => {
     if (!matchState) {
@@ -302,6 +310,61 @@ export default function MatchPage() {
     }
     prevScores.current = { you: yourScore, opponent: opponentScore };
   }, [yourScore, opponentScore, matchState?.matchId]);
+
+  useEffect(() => {
+    if (!matchState) {
+      activeMatchId.current = null;
+      prevHistoryLength.current = null;
+      setRevealAnswer(null);
+      return;
+    }
+
+    if (activeMatchId.current !== matchState.matchId) {
+      activeMatchId.current = matchState.matchId;
+      prevHistoryLength.current = matchState.history.length;
+      setRevealAnswer(null);
+      return;
+    }
+
+    const previousLength = prevHistoryLength.current ?? matchState.history.length;
+    if (matchState.status !== "ended" && matchState.history.length > previousLength) {
+      const latest = matchState.history[matchState.history.length - 1];
+      setRevealAnswer(latest);
+    }
+    prevHistoryLength.current = matchState.history.length;
+  }, [matchState?.matchId, matchState?.history.length, matchState?.status]);
+
+  useEffect(() => {
+    if (!revealAnswer) {
+      if (revealTimer.current) {
+        window.clearTimeout(revealTimer.current);
+        revealTimer.current = null;
+      }
+      return;
+    }
+
+    if (revealTimer.current) {
+      window.clearTimeout(revealTimer.current);
+    }
+
+    revealTimer.current = window.setTimeout(() => {
+      setRevealAnswer(null);
+      revealTimer.current = null;
+    }, 2400);
+
+    return () => {
+      if (revealTimer.current) {
+        window.clearTimeout(revealTimer.current);
+        revealTimer.current = null;
+      }
+    };
+  }, [revealAnswer]);
+
+  useEffect(() => {
+    if (ended) {
+      setRevealAnswer(null);
+    }
+  }, [ended]);
 
   if (ended && matchState) {
     return (
@@ -387,6 +450,8 @@ export default function MatchPage() {
           )}
         </SceneFrame>
       </div>
+
+      {showReveal && revealAnswer && <ResponseReveal answer={revealAnswer} />}
 
       {isDisconnected && (
         <OverlayNotice
@@ -777,6 +842,48 @@ function ModalCard({
         <button className="modal-close" onClick={onClose} aria-label="Chiudi">
           x
         </button>
+      </div>
+    </div>
+  );
+}
+
+function ResponseReveal({ answer }: { answer: HistoryItem }) {
+  const acidColor = colorForName(answer.acidColor);
+  const baseColor = colorForName(answer.baseColor);
+  const acidIsClear = answer.acidColor.toLowerCase() === "incolore";
+  const baseIsClear = answer.baseColor.toLowerCase() === "incolore";
+
+  return (
+    <div className="modal-backdrop reveal-backdrop">
+      <div
+        className="modal-card reveal-card"
+        role="dialog"
+        aria-live="assertive"
+        aria-modal="true"
+      >
+        <div className="modal-title">Risposta</div>
+        <div className="reveal-indicator">{answer.indicatorName}</div>
+        <div className="reveal-outcome">
+          <span className={`outcome-badge ${answer.outcome.toLowerCase()}`}>
+            {answer.outcome}
+          </span>
+        </div>
+        <div className="reveal-swatches">
+          <div className="swatch">
+            <span
+              className={`swatch-color ${acidIsClear ? "is-clear" : ""}`}
+              style={{ backgroundColor: acidColor }}
+            />
+            <span>Acida: {answer.acidColor}</span>
+          </div>
+          <div className="swatch">
+            <span
+              className={`swatch-color ${baseIsClear ? "is-clear" : ""}`}
+              style={{ backgroundColor: baseColor }}
+            />
+            <span>Basica: {answer.baseColor}</span>
+          </div>
+        </div>
       </div>
     </div>
   );

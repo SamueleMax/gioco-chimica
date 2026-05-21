@@ -591,32 +591,6 @@ button {
   color: var(--turn-chip-active-text);
 }
 
-.orbital {
-  width: 90px;
-  height: 90px;
-  margin: 0 auto;
-  position: relative;
-}
-
-.orbital-core {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: var(--accent-3);
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
-
-.orbital-ring {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  border: 2px dashed var(--border-strong);
-  animation: spin 4s linear infinite;
-}
-
 .wait-dots {
   display: flex;
   justify-content: center;

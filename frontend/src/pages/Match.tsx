@@ -350,7 +350,7 @@ export default function MatchPage() {
     revealTimer.current = window.setTimeout(() => {
       setRevealAnswer(null);
       revealTimer.current = null;
-    }, 2400);
+    }, 5000);
 
     return () => {
       if (revealTimer.current) {
@@ -518,12 +518,7 @@ function IdleScene({ onQuickMatch, onHome }: { onQuickMatch: () => void; onHome:
 function MatchmakingScene({ onCancel }: { onCancel: () => void }) {
   return (
     <div className="scene-card">
-      <div className="orbital">
-        <div className="orbital-core" />
-        <div className="orbital-ring" />
-      </div>
       <div className="scene-title">Cerco un avversario</div>
-      <p className="scene-subtitle">Sto mescolando le provette. Restate connessi.</p>
       <div className="wait-dots" aria-hidden="true">
         <span />
         <span />
@@ -634,7 +629,7 @@ function P2IndicatorScene({
     <div className="scene-card">
       <div className="turn-chip active">Il tuo turno</div>
       <div className="scene-title">Scegli un indicatore</div>
-      <p className="scene-subtitle">Ogni carta e una domanda.</p>
+      <p className="scene-subtitle">Ogni carta è una domanda.</p>
 
       <input
         className="input search-input"
@@ -937,7 +932,7 @@ function MatchHud({
       </div>
       <div className="hud-meta">
         <div className="hud-meta-line">Domande: {questionsCount}</div>
-        <div className="hud-meta-line">Penalita: -{yourPenalty}</div>
+        <div className="hud-meta-line">Penalità: -{yourPenalty}</div>
         <div className={`hud-connection ${opponentConnected ? "ok" : "down"}`}>
           <span className="status-dot" />
           {opponentConnected ? "Avversario connesso" : `Disconnesso ${graceSeconds ?? 0}s`}
@@ -1185,7 +1180,7 @@ function createNotificationHandler(
         subtitle: "Riprova con la categoria corretta.",
         role: "p1",
       });
-      pushToast("Penalita -2 applicata", "warn");
+      pushToast("Penalità -2 applicata", "warn");
       return;
     }
 
@@ -1195,7 +1190,7 @@ function createNotificationHandler(
         subtitle: "Riprova con un altro valore.",
         role: "p2",
       });
-      pushToast("Penalita -2 applicata", "warn");
+      pushToast("Penalità -2 applicata", "warn");
       return;
     }
 

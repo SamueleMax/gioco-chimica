@@ -37,7 +37,7 @@ export default function HomePage() {
       <div className="home-hero">
         <div className="home-title">Missione pH</div>
         <p className="home-subtitle">
-          Duello a due tra indicatori, strategia e penalita. Ogni mossa conta.
+          Duello a due tra indicatori, strategia e penalità. Ogni mossa conta.
         </p>
         <div className="home-badges">
           <span className="badge">2 giocatori</span>
@@ -81,7 +81,7 @@ export default function HomePage() {
         </div>
         <div className="card home-step">
           <div className="step-title">3. Vinci con strategia</div>
-          <p>Rispondi bene e riduci le penalita per superare l'avversario.</p>
+          <p>Rispondi bene e riduci le penalità per superare l'avversario.</p>
         </div>
       </div>
     </section>

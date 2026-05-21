@@ -25,7 +25,7 @@ export default function LeaderboardPage() {
       {entries.length === 0 ? (
         <div className="card empty-card">
           <h3>Nessun risultato disponibile</h3>
-          <p>La classifica si riempira con le prime partite.</p>
+          <p>La classifica si riempirà con le prime partite.</p>
         </div>
       ) : (
         <div className="leaderboard-list">
